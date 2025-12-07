@@ -106,9 +106,7 @@ const LoginPage = () => {
             </div>
           </div>
           
-          <div className="bg-card border border-border rounded-lg p-4">
-            <p className="text-xs text-muted-foreground mb-2">Demo Credentials:</p>
-          </div>
+          
         </div>
 
         {/* Login Form Section */}
