@@ -1,28 +1,66 @@
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { getResidents, calculateBillTotal } from '@/utils/storage';
+import { getAllResidentsWithCalculations, calculateBillTotal } from '@/utils/storage';
 import { Users, Home, IndianRupee, TrendingUp, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import { Skeleton } from '@/components/ui/skeleton'; // ADDED SKELETON IMPORT
 
 const DashboardContent = () => {
-  const residents = getResidents();
+  const [residents, setResidents] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
   const maxCapacity = 15;
-  const occupancyRate = ((residents.length / maxCapacity) * 100).toFixed(1);
+
+  // Use useCallback for stable function reference
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Use the new wrapper function from storage.js
+      const residentList = await getAllResidentsWithCalculations();
+      // residents is guaranteed to be an array here due to safety check in getAllResidentsWithCalculations
+      setResidents(residentList || []); 
+    } catch (error) {
+      toast.error('Failed to load dashboard data.');
+      setResidents([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Use a safety check for residents array before running calculations (solves the error)
+  const safeResidents = residents || [];
   
-  // Calculate statistics
-  const totalPending = residents.reduce((sum, resident) => {
-    const unpaidBills = resident.bills?.filter(b => !b.paid) || [];
-    return sum + unpaidBills.reduce((billSum, bill) => billSum + calculateBillTotal(bill), 0);
-  }, 0);
+  // Calculate statistics - residents are guaranteed to have the totalDue field
+  const totalPending = safeResidents.reduce((sum, resident) => sum + (resident.totalDue || 0), 0);
   
-  const residentsWithDues = residents.filter(resident => {
-    const unpaidBills = resident.bills?.filter(b => !b.paid) || [];
-    return unpaidBills.length > 0;
-  }).length;
+  const residentsWithDues = safeResidents.filter(resident => (resident.totalDue || 0) > 0).length;
   
-  const totalCollected = residents.reduce((sum, resident) => {
+  const totalCollected = safeResidents.reduce((sum, resident) => {
     const paidBills = resident.bills?.filter(b => b.paid) || [];
     return sum + paidBills.reduce((billSum, bill) => billSum + calculateBillTotal(bill), 0);
   }, 0);
+  
+  const occupancyRate = safeResidents.length > 0 ? ((safeResidents.length / maxCapacity) * 100).toFixed(1) : 0;
+  
+
+  if (isLoading) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
+          <p className="text-muted-foreground">Overview of PG management statistics</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32" />)}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -40,9 +78,9 @@ const DashboardContent = () => {
             <Users className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">{residents.length}</div>
+            <div className="text-3xl font-bold text-foreground">{safeResidents.length}</div>
             <p className="text-xs text-muted-foreground mt-2">
-              <span className="text-primary font-medium">{maxCapacity - residents.length}</span> rooms available
+              <span className="text-primary font-medium">{maxCapacity - safeResidents.length}</span> rooms available
             </p>
           </CardContent>
         </Card>
@@ -102,9 +140,8 @@ const DashboardContent = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {residents.slice(0, 5).map((resident) => {
-              const unpaidBills = resident.bills?.filter(b => !b.paid) || [];
-              const totalDue = unpaidBills.reduce((sum, bill) => sum + calculateBillTotal(bill), 0);
+            {safeResidents.slice(0, 5).map((resident) => {
+              const totalDue = resident.totalDue || 0;
               
               return (
                 <div key={resident.id} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">

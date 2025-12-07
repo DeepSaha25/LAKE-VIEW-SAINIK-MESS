@@ -63,7 +63,7 @@ const LoginPage = () => {
               <Building2 className="h-8 w-8 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Lakeview Sanic</h1>
+              <h1 className="text-3xl font-bold text-foreground">Lakeview Sanik Mess</h1>
               <p className="text-muted-foreground">Mess PG Management</p>
             </div>
           </div>
@@ -73,10 +73,7 @@ const LoginPage = () => {
               <div className="bg-accent-light rounded-lg p-2 mt-1">
                 <Shield className="h-5 w-5 text-accent" />
               </div>
-              <div>
-                <h3 className="font-semibold text-foreground">Secure Management</h3>
-                <p className="text-sm text-muted-foreground">Safe and secure billing system for PG residents</p>
-              </div>
+          
             </div>
             
             <div className="flex items-start space-x-3">

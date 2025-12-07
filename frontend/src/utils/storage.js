@@ -1,222 +1,170 @@
-// LocalStorage utility functions for PG Management
+import axios from 'axios';
+
+// --- Configuration ---
+// Read the API URL from the environment variable (set in frontend/.env)
+const API_URL = process.env.REACT_APP_API_URL;
+if (!API_URL) {
+    console.error("REACT_APP_API_URL not set. Check your frontend/.env file.");
+}
+
+// Authentication for admin requests (using Basic Auth)
+const ADMIN_USERNAME = 'admin';
+const ADMIN_PASSWORD = 'admin123';
+const authHeader = {
+    headers: {
+        Authorization: `Basic ${btoa(`${ADMIN_USERNAME}:${ADMIN_PASSWORD}`)}`
+    }
+};
 
 const STORAGE_KEYS = {
-  RESIDENTS: 'pg_residents',
-  ADMIN: 'pg_admin',
-  CURRENT_USER: 'pg_current_user'
+    CURRENT_USER: 'pg_current_user'
 };
 
-// Initialize storage with sample data
-export const initializeStorage = () => {
-  // Check if data already exists
-  const existingResidents = localStorage.getItem(STORAGE_KEYS.RESIDENTS);
-  
-  if (!existingResidents) {
-    // Sample residents data
-    const sampleResidents = [
-      {
-        id: '1',
-        name: 'Rahul Kumar',
-        room: '101',
-        phone: '9876543210',
-        email: 'rahul@example.com',
-        joinDate: '2024-01-01',
-        bills: [
-          {
-            month: 'November',
-            year: 2024,
-            rent: 5000,
-            electricity: 800,
-            food: 3500,
-            other: 200,
-            paid: false,
-            dueDate: '2024-11-05'
-          },
-          {
-            month: 'October',
-            year: 2024,
-            rent: 5000,
-            electricity: 750,
-            food: 3500,
-            other: 150,
-            paid: true,
-            paidDate: '2024-10-03',
-            dueDate: '2024-10-05'
-          }
-        ]
-      },
-      {
-        id: '2',
-        name: 'Priya Sharma',
-        room: '102',
-        phone: '9876543211',
-        email: 'priya@example.com',
-        joinDate: '2024-02-15',
-        bills: [
-          {
-            month: 'November',
-            year: 2024,
-            rent: 5000,
-            electricity: 650,
-            food: 3500,
-            other: 0,
-            paid: false,
-            dueDate: '2024-11-05'
-          },
-          {
-            month: 'October',
-            year: 2024,
-            rent: 5000,
-            electricity: 700,
-            food: 3500,
-            other: 100,
-            paid: true,
-            paidDate: '2024-10-02',
-            dueDate: '2024-10-05'
-          }
-        ]
-      },
-      {
-        id: '3',
-        name: 'Amit Patel',
-        room: '103',
-        phone: '9876543212',
-        email: 'amit@example.com',
-        joinDate: '2024-01-20',
-        bills: [
-          {
-            month: 'November',
-            year: 2024,
-            rent: 5000,
-            electricity: 900,
-            food: 3500,
-            other: 500,
-            paid: false,
-            dueDate: '2024-11-05'
-          }
-        ]
-      }
-    ];
-    
-    localStorage.setItem(STORAGE_KEYS.RESIDENTS, JSON.stringify(sampleResidents));
-  }
-  
-  // Set admin credentials
-  const adminData = {
-    username: 'admin',
-    password: 'admin123',
-    name: 'Admin',
-    email: 'admin@lakeviewsanic.com'
-  };
-  localStorage.setItem(STORAGE_KEYS.ADMIN, JSON.stringify(adminData));
+// --- Frontend Utility Functions (Calculations) ---
+
+export const calculateBillTotal = (bill) => {
+    return (bill.rent || 0) + (bill.electricity || 0) + (bill.food || 0) + (bill.other || 0);
 };
 
-// Get all residents
-export const getResidents = () => {
-  const data = localStorage.getItem(STORAGE_KEYS.RESIDENTS);
-  return data ? JSON.parse(data) : [];
+export const getUnpaidBills = (resident) => {
+    if (!resident || !resident.bills) return [];
+    return resident.bills.filter(b => !b.paid);
 };
 
-// Get resident by ID
-export const getResidentById = (id) => {
-  const residents = getResidents();
-  return residents.find(r => r.id === id);
+export const getTotalPending = (resident) => {
+    const unpaidBills = getUnpaidBills(resident);
+    return unpaidBills.reduce((total, bill) => total + calculateBillTotal(bill), 0);
 };
 
-// Add new resident
-export const addResident = (resident) => {
-  const residents = getResidents();
-  const newResident = {
-    ...resident,
-    id: Date.now().toString(),
-    joinDate: new Date().toISOString().split('T')[0],
-    bills: []
-  };
-  residents.push(newResident);
-  localStorage.setItem(STORAGE_KEYS.RESIDENTS, JSON.stringify(residents));
-  return newResident;
+
+// --- API Wrapper Functions ---
+
+// Fetches ALL residents
+export const getResidents = async () => {
+    try {
+        const response = await axios.get(`${API_URL}/residents`);
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching residents:", error);
+        return [];
+    }
 };
 
-// Update resident
-export const updateResident = (id, updates) => {
-  const residents = getResidents();
-  const index = residents.findIndex(r => r.id === id);
-  if (index !== -1) {
-    residents[index] = { ...residents[index], ...updates };
-    localStorage.setItem(STORAGE_KEYS.RESIDENTS, JSON.stringify(residents));
-    return residents[index];
-  }
-  return null;
-};
-
-// Delete resident
-export const deleteResident = (id) => {
-  const residents = getResidents();
-  const filtered = residents.filter(r => r.id !== id);
-  localStorage.setItem(STORAGE_KEYS.RESIDENTS, JSON.stringify(filtered));
-};
-
-// Add or update bill for a resident
-export const updateResidentBill = (residentId, month, year, billData) => {
-  const residents = getResidents();
-  const residentIndex = residents.findIndex(r => r.id === residentId);
-  
-  if (residentIndex !== -1) {
-    const resident = residents[residentIndex];
-    const billIndex = resident.bills.findIndex(
-      b => b.month === month && b.year === year
-    );
-    
-    if (billIndex !== -1) {
-      // Update existing bill
-      resident.bills[billIndex] = { ...resident.bills[billIndex], ...billData };
-    } else {
-      // Add new bill
-      resident.bills.unshift({ month, year, ...billData });
+// NEW WRAPPER FUNCTION: Fetches all residents and pre-calculates the total due for the Dashboard
+export const getAllResidentsWithCalculations = async () => {
+    const residents = await getResidents();
+    if (!Array.isArray(residents)) {
+        console.error("API did not return an array of residents.");
+        return [];
     }
     
-    localStorage.setItem(STORAGE_KEYS.RESIDENTS, JSON.stringify(residents));
-    return resident;
-  }
-  return null;
+    return residents.map(resident => ({
+        ...resident,
+        // Calculate total due using the existing utility function
+        totalDue: getTotalPending(resident)
+    }));
 };
 
-// Get admin credentials
+
+// Fetches a single resident by ID
+export const getResidentById = async (id) => {
+    try {
+        const response = await axios.get(`${API_URL}/residents/${id}`);
+        return response.data;
+    } catch (error) {
+        console.error(`Error fetching resident ${id}:`, error);
+        return null;
+    }
+};
+
+// Fetches admin credentials
 export const getAdminCredentials = () => {
-  const data = localStorage.getItem(STORAGE_KEYS.ADMIN);
-  return data ? JSON.parse(data) : null;
+    return {
+        username: ADMIN_USERNAME,
+        password: ADMIN_PASSWORD,
+        name: 'Admin',
+        email: 'admin@lakeviewsainik.com'
+    };
 };
 
-// Set current logged in user
+// RESIDENT MANAGEMENT (Admin Only)
+
+export const addResident = async (resident) => {
+    try {
+        const response = await axios.post(`${API_URL}/residents`, resident, authHeader);
+        return response.data;
+    } catch (error) {
+        console.error("Error adding resident:", error);
+        throw error;
+    }
+};
+
+export const updateResident = async (id, updates) => {
+    try {
+        const response = await axios.put(`${API_URL}/residents/${id}`, updates, authHeader);
+        return response.data;
+    } catch (error) {
+        console.error(`Error updating resident ${id}:`, error);
+        throw error;
+    }
+};
+
+export const deleteResident = async (id) => {
+    try {
+        await axios.delete(`${API_URL}/residents/${id}`, authHeader);
+    } catch (error) {
+        console.error(`Error deleting resident ${id}:`, error);
+        throw error;
+    }
+};
+
+// BILL MANAGEMENT (Admin Only)
+
+export const updateResidentBill = async (residentId, month, year, billData) => {
+    // The API handles both adding a new bill and updating an existing one
+    const billPayload = {
+        month,
+        year,
+        rent: billData.rent,
+        electricity: billData.electricity,
+        food: billData.food,
+        other: billData.other,
+        paid: billData.paid,
+        dueDate: billData.dueDate,
+        paidDate: billData.paid ? (billData.paidDate || new Date().toISOString().split('T')[0]) : null
+    };
+
+    try {
+        const response = await axios.post(`${API_URL}/residents/${residentId}/bills`, billPayload, authHeader);
+        return response.data;
+    } catch (error) {
+        console.error(`Error adding/updating bill for resident ${residentId}:`, error);
+        throw error;
+    }
+};
+
+// --- Local Storage User State (for session management) ---
+
 export const setCurrentUser = (user) => {
-  localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+    // Only store minimal info for session (id/type), not the whole resident object
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify({
+        id: user.id,
+        type: user.type,
+        name: user.name,
+        room: user.room 
+    }));
 };
 
-// Get current logged in user
 export const getCurrentUser = () => {
-  const data = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-  return data ? JSON.parse(data) : null;
+    const data = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+    return data ? JSON.parse(data) : null;
 };
 
-// Logout
 export const logout = () => {
-  localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
 };
 
-// Calculate total due for a bill
-export const calculateBillTotal = (bill) => {
-  return (bill.rent || 0) + (bill.electricity || 0) + (bill.food || 0) + (bill.other || 0);
-};
-
-// Get all unpaid bills for a resident
-export const getUnpaidBills = (residentId) => {
-  const resident = getResidentById(residentId);
-  if (!resident) return [];
-  return resident.bills.filter(b => !b.paid);
-};
-
-// Calculate total pending amount for a resident
-export const getTotalPending = (residentId) => {
-  const unpaidBills = getUnpaidBills(residentId);
-  return unpaidBills.reduce((total, bill) => total + calculateBillTotal(bill), 0);
+// Note: initializeStorage is no longer needed
+export const initializeStorage = () => {
+    console.log("Storage initialization delegated to API.");
 };
