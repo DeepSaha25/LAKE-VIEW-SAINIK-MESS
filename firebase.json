@@ -1,15 +1,11 @@
 {
   "hosting": {
-    // CRUCIAL: Must point to the folder containing index.html, which is inside 'frontend'
-    "public": "frontend/build", 
-
+    "public": "build_output", 
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
     ],
-
-    // CRUCIAL: This ensures React Router works by redirecting all unknown paths to index.html
     "rewrites": [
       {
         "source": "**",
