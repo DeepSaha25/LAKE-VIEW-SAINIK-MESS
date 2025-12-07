@@ -8,13 +8,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { getResidents, updateResidentBill, calculateBillTotal } from '@/utils/storage';
-import { Plus, IndianRupee, Calendar, CheckCircle2 } from 'lucide-react';
+import { Plus, IndianRupee, Calendar, CheckCircle2, Edit } from 'lucide-react'; // Added Edit icon
 import { toast } from 'sonner';
 
 const BillsContent = () => {
   const [residents, setResidents] = useState(getResidents());
   const [isAddBillDialogOpen, setIsAddBillDialogOpen] = useState(false);
   const [selectedResidentId, setSelectedResidentId] = useState('');
+  
+  // NEW STATE: Stores information about the bill being edited
+  const [editingBill, setEditingBill] = useState(null); 
+  
   const [billData, setBillData] = useState({
     month: new Date().toLocaleString('default', { month: 'long' }),
     year: new Date().getFullYear(),
@@ -37,8 +41,43 @@ const BillsContent = () => {
   const refreshResidents = () => {
     setResidents(getResidents());
   };
+  
+  // NEW/UPDATED: Helper to reset the form and open the dialog for adding a new bill
+  const openAddDialog = () => {
+    setEditingBill(null); // Clear editing state
+    setSelectedResidentId('');
+    setBillData({
+      month: new Date().toLocaleString('default', { month: 'long' }),
+      year: new Date().getFullYear(),
+      rent: '',
+      electricity: '',
+      food: '',
+      other: '',
+      paid: false,
+      dueDate: ''
+    });
+    setIsAddBillDialogOpen(true);
+  };
+  
+  // NEW: Helper to pre-fill the form and open the dialog for editing an existing bill
+  const openEditDialog = (bill) => {
+    setEditingBill({ residentId: bill.residentId, month: bill.month, year: bill.year });
+    setSelectedResidentId(bill.residentId);
+    setBillData({
+      month: bill.month,
+      year: bill.year,
+      rent: bill.rent.toString(),
+      electricity: bill.electricity.toString(),
+      food: bill.food.toString(),
+      other: bill.other.toString(),
+      paid: bill.paid,
+      dueDate: bill.dueDate || ''
+    });
+    setIsAddBillDialogOpen(true);
+  }
 
-  const handleAddBill = () => {
+  // UPDATED: Handles both adding a new bill and saving changes to an existing one
+  const handleSaveBill = () => {
     if (!selectedResidentId) {
       toast.error('Please select a resident');
       return;
@@ -50,6 +89,10 @@ const BillsContent = () => {
     }
 
     const bill = {
+      // Use billData for month/year for Add, or editingBill info for Edit
+      month: editingBill ? editingBill.month : billData.month,
+      year: editingBill ? editingBill.year : parseInt(billData.year),
+      
       rent: parseFloat(billData.rent) || 0,
       electricity: parseFloat(billData.electricity) || 0,
       food: parseFloat(billData.food) || 0,
@@ -60,23 +103,21 @@ const BillsContent = () => {
 
     if (bill.paid) {
       bill.paidDate = new Date().toISOString().split('T')[0];
+    } else {
+      bill.paidDate = undefined; // Clear paidDate if marked unpaid during edit
     }
 
-    updateResidentBill(selectedResidentId, billData.month, parseInt(billData.year), bill);
-    toast.success('Bill added successfully');
+    updateResidentBill(selectedResidentId, bill.month, bill.year, bill);
+    toast.success(`Bill ${editingBill ? 'updated' : 'added'} successfully`);
     
-    // Reset form
+    // Reset and close
     setBillData({
       month: new Date().toLocaleString('default', { month: 'long' }),
       year: new Date().getFullYear(),
-      rent: '',
-      electricity: '',
-      food: '',
-      other: '',
-      paid: false,
-      dueDate: ''
+      rent: '', electricity: '', food: '', other: '', paid: false, dueDate: ''
     });
     setSelectedResidentId('');
+    setEditingBill(null);
     setIsAddBillDialogOpen(false);
     refreshResidents();
   };
@@ -127,20 +168,29 @@ const BillsContent = () => {
         
         <Dialog open={isAddBillDialogOpen} onOpenChange={setIsAddBillDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            {/* Use the new openAddDialog helper */}
+            <Button onClick={openAddDialog}> 
               <Plus className="h-4 w-4 mr-2" />
               Add Bill
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-md sm:max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Add Monthly Bill</DialogTitle>
-              <DialogDescription>Enter bill details for a resident</DialogDescription>
+              {/* DYNAMIC DIALOG TITLE */}
+              <DialogTitle>{editingBill ? 'Edit Monthly Bill' : 'Add Monthly Bill'}</DialogTitle>
+              <DialogDescription>
+                {editingBill ? 'Update the bill details for the selected resident' : 'Enter bill details for a resident'}
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="resident-select">Select Resident *</Label>
-                <Select value={selectedResidentId} onValueChange={setSelectedResidentId}>
+                {/* Disable resident selection if editing */}
+                <Select 
+                  value={selectedResidentId} 
+                  onValueChange={setSelectedResidentId}
+                  disabled={!!editingBill} 
+                >
                   <SelectTrigger id="resident-select">
                     <SelectValue placeholder="Choose a resident" />
                   </SelectTrigger>
@@ -154,10 +204,15 @@ const BillsContent = () => {
                 </Select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="month-select">Month *</Label>
-                  <Select value={billData.month} onValueChange={(value) => setBillData({ ...billData, month: value })}>
+                  {/* Disable month selection if editing */}
+                  <Select 
+                    value={billData.month} 
+                    onValueChange={(value) => setBillData({ ...billData, month: value })}
+                    disabled={!!editingBill} 
+                  >
                     <SelectTrigger id="month-select">
                       <SelectValue />
                     </SelectTrigger>
@@ -173,7 +228,12 @@ const BillsContent = () => {
 
                 <div className="space-y-2">
                   <Label htmlFor="year-select">Year *</Label>
-                  <Select value={billData.year.toString()} onValueChange={(value) => setBillData({ ...billData, year: parseInt(value) })}>
+                  {/* Disable year selection if editing */}
+                  <Select 
+                    value={billData.year.toString()} 
+                    onValueChange={(value) => setBillData({ ...billData, year: parseInt(value) })}
+                    disabled={!!editingBill}
+                  >
                     <SelectTrigger id="year-select">
                       <SelectValue />
                     </SelectTrigger>
@@ -188,7 +248,7 @@ const BillsContent = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="rent">Rent (₹)</Label>
                   <Input
@@ -270,7 +330,10 @@ const BillsContent = () => {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsAddBillDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleAddBill}>Add Bill</Button>
+              {/* DYNAMIC BUTTON TEXT */}
+              <Button onClick={handleSaveBill}>
+                {editingBill ? 'Save Changes' : 'Add Bill'}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -284,7 +347,7 @@ const BillsContent = () => {
         </CardHeader>
         <CardContent>
           {allBills.length > 0 ? (
-            <div className="border rounded-lg overflow-hidden">
+            <div className="border rounded-lg overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -353,13 +416,23 @@ const BillsContent = () => {
                         </TableCell>
                         <TableCell>
                           {!bill.paid && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleMarkAsPaid(bill.residentId, bill.month, bill.year)}
-                            >
-                              Mark Paid
-                            </Button>
+                            <div className='flex space-x-2'>
+                              {/* NEW: Edit Bill Button */}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openEditDialog(bill)}
+                              >
+                                <Edit className='h-4 w-4'/>
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleMarkAsPaid(bill.residentId, bill.month, bill.year)}
+                              >
+                                Mark Paid
+                              </Button>
+                            </div>
                           )}
                         </TableCell>
                       </TableRow>

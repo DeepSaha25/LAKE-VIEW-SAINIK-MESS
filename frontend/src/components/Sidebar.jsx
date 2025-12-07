@@ -10,7 +10,7 @@ const Sidebar = ({ activeView, setActiveView, onLogout }) => {
   ];
 
   return (
-    <aside className="w-64 bg-sidebar text-sidebar-foreground flex flex-col sidebar-shadow">
+    <aside className="bg-sidebar text-sidebar-foreground flex flex-col sidebar-shadow md:w-64 w-full">
       {/* Logo */}
       <div className="p-6 border-b border-sidebar-hover">
         <div className="flex items-center space-x-3">
@@ -18,7 +18,7 @@ const Sidebar = ({ activeView, setActiveView, onLogout }) => {
             <Building2 className="h-6 w-6 text-primary-foreground" />
           </div>
           <div>
-            <h2 className="text-lg font-bold">Lakeview Sanic</h2>
+            <h2 className="text-lg font-bold">Lakeview Sainik</h2>
             <p className="text-xs text-sidebar-foreground/70">Admin Panel</p>
           </div>
         </div>
