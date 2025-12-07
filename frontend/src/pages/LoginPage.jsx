@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,8 +20,21 @@ const LoginPage = () => {
   
   // Resident login state
   const [selectedResident, setSelectedResident] = useState('');
-  
-  const residents = getResidents();
+  const [residents, setResidents] = useState([]); // Initialize as empty array
+
+  // NEW: Fetch residents from API on load
+  useEffect(() => {
+    const fetchResidents = async () => {
+      try {
+        const data = await getResidents();
+        setResidents(data || []);
+      } catch (error) {
+        console.error("Failed to load residents", error);
+        toast.error("Could not load resident list");
+      }
+    };
+    fetchResidents();
+  }, []);
 
   const handleAdminLogin = (e) => {
     e.preventDefault();
@@ -43,9 +56,12 @@ const LoginPage = () => {
       return;
     }
     
+    // Find full resident object from our API-loaded list
     const resident = residents.find(r => r.id === selectedResident);
+    
     if (resident) {
-      setCurrentUser({ type: 'resident', ...resident });
+      // Store minimal session info
+      setCurrentUser({ type: 'resident', id: resident.id, name: resident.name, room: resident.room });
       toast.success(`Welcome, ${resident.name}!`);
       navigate('/resident');
     } else {
@@ -63,7 +79,7 @@ const LoginPage = () => {
               <Building2 className="h-8 w-8 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Lakeview Sanik Mess</h1>
+              <h1 className="text-3xl font-bold text-foreground">Lakeview Sainik</h1>
               <p className="text-muted-foreground">Mess PG Management</p>
             </div>
           </div>
@@ -73,7 +89,10 @@ const LoginPage = () => {
               <div className="bg-accent-light rounded-lg p-2 mt-1">
                 <Shield className="h-5 w-5 text-accent" />
               </div>
-          
+              <div>
+                <h3 className="font-semibold text-foreground">Secure Management</h3>
+                <p className="text-sm text-muted-foreground">Safe and secure billing system for PG residents</p>
+              </div>
             </div>
             
             <div className="flex items-start space-x-3">

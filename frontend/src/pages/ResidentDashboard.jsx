@@ -1,31 +1,50 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCurrentUser, logout, calculateBillTotal } from '@/utils/storage';
+import { getCurrentUser, logout, calculateBillTotal, getResidentById } from '@/utils/storage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { LogOut, User, Home, Calendar, IndianRupee } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const ResidentDashboard = () => {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
+  const [residentData, setResidentData] = useState(null); // Full data from API
   const [selectedMonth, setSelectedMonth] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const user = getCurrentUser();
     if (!user || user.type !== 'resident') {
       navigate('/');
-    } else {
-      setCurrentUser(user);
-      // Set current month as default
-      const currentMonth = new Date().toLocaleString('default', { month: 'long' });
-      if (user.bills && user.bills.length > 0) {
-        const latestBill = user.bills[0];
-        setSelectedMonth(`${latestBill.month}-${latestBill.year}`);
+      return;
+    } 
+    
+    setCurrentUser(user);
+
+    // NEW: Fetch full resident details (including bills) from API
+    const fetchDetails = async () => {
+      setIsLoading(true);
+      try {
+        const data = await getResidentById(user.id);
+        if (data) {
+          setResidentData(data);
+          // Set default month to latest bill
+          if (data.bills && data.bills.length > 0) {
+            setSelectedMonth(`${data.bills[0].month}-${data.bills[0].year}`);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load resident details");
+      } finally {
+        setIsLoading(false);
       }
-    }
+    };
+
+    fetchDetails();
   }, [navigate]);
 
   const handleLogout = () => {
@@ -35,12 +54,19 @@ const ResidentDashboard = () => {
 
   if (!currentUser) return null;
 
-  const selectedBill = currentUser.bills?.find(
+  if (isLoading) {
+     return <div className="p-8"><Skeleton className="h-[200px] w-full rounded-xl" /></div>;
+  }
+
+  // Use residentData (from API) instead of currentUser (from LocalStorage) for bills
+  const bills = residentData?.bills || [];
+  
+  const selectedBill = bills.find(
     (b) => `${b.month}-${b.year}` === selectedMonth
   );
 
-  const totalDue = currentUser.bills
-    ?.filter((b) => !b.paid)
+  const totalDue = bills
+    .filter((b) => !b.paid)
     .reduce((sum, bill) => sum + calculateBillTotal(bill), 0) || 0;
 
   return (
@@ -54,7 +80,7 @@ const ResidentDashboard = () => {
                 <Home className="h-6 w-6 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-foreground">Lakeview Sanic PG</h1>
+                <h1 className="text-2xl font-bold text-foreground">Lakeview Sainik PG</h1>
                 <p className="text-sm text-muted-foreground">Resident Portal</p>
               </div>
             </div>
@@ -103,7 +129,7 @@ const ResidentDashboard = () => {
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>Phone Number</CardDescription>
-              <CardTitle className="text-xl">{currentUser.phone}</CardTitle>
+              <CardTitle className="text-xl">{residentData?.phone || currentUser.phone}</CardTitle>
             </CardHeader>
           </Card>
         </div>
@@ -122,7 +148,7 @@ const ResidentDashboard = () => {
                 <SelectValue placeholder="Choose a month" />
               </SelectTrigger>
               <SelectContent>
-                {currentUser.bills?.map((bill) => (
+                {bills.map((bill) => (
                   <SelectItem key={`${bill.month}-${bill.year}`} value={`${bill.month}-${bill.year}`}>
                     {bill.month} {bill.year}
                   </SelectItem>
@@ -219,7 +245,7 @@ const ResidentDashboard = () => {
         ) : (
           <Card>
             <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">No bill data available. Please select a month.</p>
+              <p className="text-muted-foreground">No bill data available.</p>
             </CardContent>
           </Card>
         )}
