@@ -1,3 +1,5 @@
+# frontend/src/components/ui/skeleton.jsx
+
 import os
 import logging
 from pathlib import Path
@@ -105,9 +107,11 @@ def resident_to_dict(resident):
     return resident
 
 async def initialize_sample_data():
+    # FIX: Changed 'from .sample_data import sample_residents' to direct import
+    from sample_data import sample_residents 
+    
     if await residents_collection.count_documents({}) == 0:
         logger.info("Initializing sample resident data.")
-        from .sample_data import sample_residents
         
         # Prepare data for MongoDB insert
         mongo_residents = []
