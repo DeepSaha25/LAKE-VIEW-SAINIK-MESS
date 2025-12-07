@@ -40,7 +40,7 @@ const BillsContent = () => {
   const currentYear = new Date().getFullYear();
   const years = [currentYear, currentYear - 1];
 
-  // NEW: Fetch residents from API on load
+  // Fetch residents from API on load
   const refreshResidents = async () => {
     setIsLoading(true);
     try {
@@ -198,14 +198,15 @@ const BillsContent = () => {
               Add Bill
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md sm:max-w-2xl">
+          {/* UPDATED: Better mobile responsiveness with scroll and width constraints */}
+          <DialogContent className="w-[95vw] max-w-md sm:max-w-2xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingBill ? 'Edit Monthly Bill' : 'Add Monthly Bill'}</DialogTitle>
               <DialogDescription>
                 {editingBill ? 'Update the bill details for the selected resident' : 'Enter bill details for a resident'}
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
+            <div className="space-y-4 py-2">
               <div className="space-y-2">
                 <Label htmlFor="resident-select">Select Resident *</Label>
                 <Select 
@@ -348,7 +349,7 @@ const BillsContent = () => {
                 </p>
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="gap-2 sm:gap-0">
               <Button variant="outline" onClick={() => setIsAddBillDialogOpen(false)}>Cancel</Button>
               <Button onClick={handleSaveBill}>
                 {editingBill ? 'Save Changes' : 'Add Bill'}
