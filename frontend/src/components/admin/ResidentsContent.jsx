@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,9 +9,11 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { getResidents, addResident, updateResident, deleteResident, calculateBillTotal } from '@/utils/storage';
 import { Plus, Edit, Trash2, Phone, Mail, IndianRupee } from 'lucide-react';
 import { toast } from 'sonner';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const ResidentsContent = () => {
-  const [residents, setResidents] = useState(getResidents());
+  const [residents, setResidents] = useState([]); // Initialize as empty array
+  const [isLoading, setIsLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingResident, setEditingResident] = useState(null);
@@ -23,43 +25,67 @@ const ResidentsContent = () => {
   });
 
   const maxCapacity = 15;
-  const canAddMore = residents.length < maxCapacity;
 
-  const refreshResidents = () => {
-    setResidents(getResidents());
+  // NEW: Fetch residents from API on load
+  const refreshResidents = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getResidents();
+      setResidents(data || []);
+    } catch (error) {
+      toast.error("Failed to load residents");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleAdd = () => {
+  useEffect(() => {
+    refreshResidents();
+  }, []);
+
+  const handleAdd = async () => {
     if (!formData.name || !formData.room || !formData.phone) {
       toast.error('Please fill all required fields');
       return;
     }
     
-    addResident(formData);
-    toast.success('Resident added successfully');
-    setFormData({ name: '', room: '', phone: '', email: '' });
-    setIsAddDialogOpen(false);
-    refreshResidents();
+    try {
+      await addResident(formData);
+      toast.success('Resident added successfully');
+      setFormData({ name: '', room: '', phone: '', email: '' });
+      setIsAddDialogOpen(false);
+      refreshResidents();
+    } catch (error) {
+      toast.error('Failed to add resident');
+    }
   };
 
-  const handleEdit = () => {
+  const handleEdit = async () => {
     if (!formData.name || !formData.room || !formData.phone) {
       toast.error('Please fill all required fields');
       return;
     }
     
-    updateResident(editingResident.id, formData);
-    toast.success('Resident updated successfully');
-    setEditingResident(null);
-    setFormData({ name: '', room: '', phone: '', email: '' });
-    setIsEditDialogOpen(false);
-    refreshResidents();
+    try {
+      await updateResident(editingResident.id, formData);
+      toast.success('Resident updated successfully');
+      setEditingResident(null);
+      setFormData({ name: '', room: '', phone: '', email: '' });
+      setIsEditDialogOpen(false);
+      refreshResidents();
+    } catch (error) {
+      toast.error('Failed to update resident');
+    }
   };
 
-  const handleDelete = (id, name) => {
-    deleteResident(id);
-    toast.success(`${name} removed successfully`);
-    refreshResidents();
+  const handleDelete = async (id, name) => {
+    try {
+      await deleteResident(id);
+      toast.success(`${name} removed successfully`);
+      refreshResidents();
+    } catch (error) {
+      toast.error('Failed to delete resident');
+    }
   };
 
   const openEditDialog = (resident) => {
@@ -72,6 +98,14 @@ const ResidentsContent = () => {
     });
     setIsEditDialogOpen(true);
   };
+
+  if (isLoading) {
+    return <div className="p-6 space-y-4">
+      {[1, 2, 3].map(i => <Skeleton key={i} className="h-40 w-full" />)}
+    </div>;
+  }
+
+  const canAddMore = residents.length < maxCapacity;
 
   return (
     <div className="space-y-6">
@@ -285,7 +319,7 @@ const ResidentsContent = () => {
         })}
       </div>
 
-      {residents.length === 0 && (
+      {!isLoading && residents.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground">No residents found. Add your first resident to get started.</p>

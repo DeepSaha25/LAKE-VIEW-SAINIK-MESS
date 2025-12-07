@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,15 +8,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { getResidents, updateResidentBill, calculateBillTotal } from '@/utils/storage';
-import { Plus, IndianRupee, Calendar, CheckCircle2, Edit } from 'lucide-react'; // Added Edit icon
+import { Plus, IndianRupee, Calendar, CheckCircle2, Edit } from 'lucide-react';
 import { toast } from 'sonner';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const BillsContent = () => {
-  const [residents, setResidents] = useState(getResidents());
+  const [residents, setResidents] = useState([]); // Initialize as empty array
+  const [isLoading, setIsLoading] = useState(true);
   const [isAddBillDialogOpen, setIsAddBillDialogOpen] = useState(false);
   const [selectedResidentId, setSelectedResidentId] = useState('');
   
-  // NEW STATE: Stores information about the bill being edited
+  // Stores information about the bill being edited
   const [editingBill, setEditingBill] = useState(null); 
   
   const [billData, setBillData] = useState({
@@ -38,13 +40,25 @@ const BillsContent = () => {
   const currentYear = new Date().getFullYear();
   const years = [currentYear, currentYear - 1];
 
-  const refreshResidents = () => {
-    setResidents(getResidents());
+  // NEW: Fetch residents from API on load
+  const refreshResidents = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getResidents();
+      setResidents(data || []);
+    } catch (error) {
+      toast.error("Failed to load bills data");
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  useEffect(() => {
+    refreshResidents();
+  }, []);
   
-  // NEW/UPDATED: Helper to reset the form and open the dialog for adding a new bill
   const openAddDialog = () => {
-    setEditingBill(null); // Clear editing state
+    setEditingBill(null);
     setSelectedResidentId('');
     setBillData({
       month: new Date().toLocaleString('default', { month: 'long' }),
@@ -59,7 +73,6 @@ const BillsContent = () => {
     setIsAddBillDialogOpen(true);
   };
   
-  // NEW: Helper to pre-fill the form and open the dialog for editing an existing bill
   const openEditDialog = (bill) => {
     setEditingBill({ residentId: bill.residentId, month: bill.month, year: bill.year });
     setSelectedResidentId(bill.residentId);
@@ -76,8 +89,7 @@ const BillsContent = () => {
     setIsAddBillDialogOpen(true);
   }
 
-  // UPDATED: Handles both adding a new bill and saving changes to an existing one
-  const handleSaveBill = () => {
+  const handleSaveBill = async () => {
     if (!selectedResidentId) {
       toast.error('Please select a resident');
       return;
@@ -89,7 +101,6 @@ const BillsContent = () => {
     }
 
     const bill = {
-      // Use billData for month/year for Add, or editingBill info for Edit
       month: editingBill ? editingBill.month : billData.month,
       year: editingBill ? editingBill.year : parseInt(billData.year),
       
@@ -104,38 +115,52 @@ const BillsContent = () => {
     if (bill.paid) {
       bill.paidDate = new Date().toISOString().split('T')[0];
     } else {
-      bill.paidDate = undefined; // Clear paidDate if marked unpaid during edit
+      bill.paidDate = undefined;
     }
 
-    updateResidentBill(selectedResidentId, bill.month, bill.year, bill);
-    toast.success(`Bill ${editingBill ? 'updated' : 'added'} successfully`);
-    
-    // Reset and close
-    setBillData({
-      month: new Date().toLocaleString('default', { month: 'long' }),
-      year: new Date().getFullYear(),
-      rent: '', electricity: '', food: '', other: '', paid: false, dueDate: ''
-    });
-    setSelectedResidentId('');
-    setEditingBill(null);
-    setIsAddBillDialogOpen(false);
-    refreshResidents();
+    try {
+      await updateResidentBill(selectedResidentId, bill.month, bill.year, bill);
+      toast.success(`Bill ${editingBill ? 'updated' : 'added'} successfully`);
+      
+      setBillData({
+        month: new Date().toLocaleString('default', { month: 'long' }),
+        year: new Date().getFullYear(),
+        rent: '', electricity: '', food: '', other: '', paid: false, dueDate: ''
+      });
+      setSelectedResidentId('');
+      setEditingBill(null);
+      setIsAddBillDialogOpen(false);
+      refreshResidents();
+    } catch (error) {
+      toast.error('Failed to save bill');
+    }
   };
 
-  const handleMarkAsPaid = (residentId, month, year) => {
+  const handleMarkAsPaid = async (residentId, month, year) => {
     const resident = residents.find(r => r.id === residentId);
     const bill = resident?.bills.find(b => b.month === month && b.year === year);
     
     if (bill) {
-      updateResidentBill(residentId, month, year, {
-        ...bill,
-        paid: true,
-        paidDate: new Date().toISOString().split('T')[0]
-      });
-      toast.success('Bill marked as paid');
-      refreshResidents();
+      try {
+        await updateResidentBill(residentId, month, year, {
+          ...bill,
+          paid: true,
+          paidDate: new Date().toISOString().split('T')[0]
+        });
+        toast.success('Bill marked as paid');
+        refreshResidents();
+      } catch (error) {
+        toast.error('Failed to update bill');
+      }
     }
   };
+
+  if (isLoading) {
+    return <div className="p-6 space-y-4">
+      <Skeleton className="h-12 w-48 mb-6" />
+      <Skeleton className="h-64 w-full rounded-xl" />
+    </div>;
+  }
 
   // Get all bills across residents
   const allBills = [];
@@ -168,7 +193,6 @@ const BillsContent = () => {
         
         <Dialog open={isAddBillDialogOpen} onOpenChange={setIsAddBillDialogOpen}>
           <DialogTrigger asChild>
-            {/* Use the new openAddDialog helper */}
             <Button onClick={openAddDialog}> 
               <Plus className="h-4 w-4 mr-2" />
               Add Bill
@@ -176,7 +200,6 @@ const BillsContent = () => {
           </DialogTrigger>
           <DialogContent className="max-w-md sm:max-w-2xl">
             <DialogHeader>
-              {/* DYNAMIC DIALOG TITLE */}
               <DialogTitle>{editingBill ? 'Edit Monthly Bill' : 'Add Monthly Bill'}</DialogTitle>
               <DialogDescription>
                 {editingBill ? 'Update the bill details for the selected resident' : 'Enter bill details for a resident'}
@@ -185,7 +208,6 @@ const BillsContent = () => {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="resident-select">Select Resident *</Label>
-                {/* Disable resident selection if editing */}
                 <Select 
                   value={selectedResidentId} 
                   onValueChange={setSelectedResidentId}
@@ -207,7 +229,6 @@ const BillsContent = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="month-select">Month *</Label>
-                  {/* Disable month selection if editing */}
                   <Select 
                     value={billData.month} 
                     onValueChange={(value) => setBillData({ ...billData, month: value })}
@@ -228,7 +249,6 @@ const BillsContent = () => {
 
                 <div className="space-y-2">
                   <Label htmlFor="year-select">Year *</Label>
-                  {/* Disable year selection if editing */}
                   <Select 
                     value={billData.year.toString()} 
                     onValueChange={(value) => setBillData({ ...billData, year: parseInt(value) })}
@@ -330,7 +350,6 @@ const BillsContent = () => {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsAddBillDialogOpen(false)}>Cancel</Button>
-              {/* DYNAMIC BUTTON TEXT */}
               <Button onClick={handleSaveBill}>
                 {editingBill ? 'Save Changes' : 'Add Bill'}
               </Button>
@@ -417,7 +436,6 @@ const BillsContent = () => {
                         <TableCell>
                           {!bill.paid && (
                             <div className='flex space-x-2'>
-                              {/* NEW: Edit Bill Button */}
                               <Button
                                 size="sm"
                                 variant="outline"
