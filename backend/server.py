@@ -55,7 +55,8 @@ class Bill(BaseModel):
     electricity: float
     food: float
     other: float
-    paid: bool
+    paidAmount: float = Field(default=0.0)  # NEW: Records partial payment
+    # REMOVED: paid: bool
     dueDate: str
     paidDate: Optional[str] = None
 

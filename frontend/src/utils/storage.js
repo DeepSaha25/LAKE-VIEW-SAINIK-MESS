@@ -23,17 +23,26 @@ const STORAGE_KEYS = {
 // --- Frontend Utility Functions (Calculations) ---
 
 export const calculateBillTotal = (bill) => {
+    // Total expected bill remains the sum of charges
     return (bill.rent || 0) + (bill.electricity || 0) + (bill.food || 0) + (bill.other || 0);
 };
 
 export const getUnpaidBills = (resident) => {
     if (!resident || !resident.bills) return [];
-    return resident.bills.filter(b => !b.paid);
+    // UPDATED LOGIC: A bill is unpaid if the total bill is greater than the paid amount
+    return resident.bills.filter(b => calculateBillTotal(b) > (b.paidAmount || 0));
 };
 
 export const getTotalPending = (resident) => {
-    const unpaidBills = getUnpaidBills(resident);
-    return unpaidBills.reduce((total, bill) => total + calculateBillTotal(bill), 0);
+    // UPDATED LOGIC: Pending is the sum of (totalBill - paidAmount) for all bills
+    const allBills = resident.bills || [];
+    
+    return allBills.reduce((totalPendingSum, bill) => {
+        const totalBill = calculateBillTotal(bill);
+        const paid = bill.paidAmount || 0;
+        const due = totalBill - paid;
+        return totalPendingSum + Math.max(0, due); // Only count positive dues
+    }, 0);
 };
 
 
@@ -50,7 +59,7 @@ export const getResidents = async () => {
     }
 };
 
-// NEW WRAPPER FUNCTION: Fetches all residents and pre-calculates the total due for the Dashboard
+// Fetches all residents and pre-calculates the total due for the Dashboard
 export const getAllResidentsWithCalculations = async () => {
     const residents = await getResidents();
     if (!Array.isArray(residents)) {
@@ -122,6 +131,7 @@ export const deleteResident = async (id) => {
 
 export const updateResidentBill = async (residentId, month, year, billData) => {
     // The API handles both adding a new bill and updating an existing one
+    // Remove 'paid' field and use the new 'paidAmount' field
     const billPayload = {
         month,
         year,
@@ -129,9 +139,9 @@ export const updateResidentBill = async (residentId, month, year, billData) => {
         electricity: billData.electricity,
         food: billData.food,
         other: billData.other,
-        paid: billData.paid,
+        paidAmount: billData.paidAmount, // NEW FIELD
         dueDate: billData.dueDate,
-        paidDate: billData.paid ? (billData.paidDate || new Date().toISOString().split('T')[0]) : null
+        paidDate: billData.paidAmount > 0 ? (billData.paidDate || new Date().toISOString().split('T')[0]) : null
     };
 
     try {

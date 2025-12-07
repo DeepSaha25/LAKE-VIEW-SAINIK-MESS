@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { getAllResidentsWithCalculations, calculateBillTotal } from '@/utils/storage';
 import { Users, Home, IndianRupee, TrendingUp, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { Skeleton } from '@/components/ui/skeleton'; // ADDED SKELETON IMPORT
+import { Skeleton } from '@/components/ui/skeleton';
 
 const DashboardContent = () => {
   const [residents, setResidents] = useState([]);
@@ -12,13 +12,10 @@ const DashboardContent = () => {
   
   const maxCapacity = 15;
 
-  // Use useCallback for stable function reference
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Use the new wrapper function from storage.js
       const residentList = await getAllResidentsWithCalculations();
-      // residents is guaranteed to be an array here due to safety check in getAllResidentsWithCalculations
       setResidents(residentList || []); 
     } catch (error) {
       toast.error('Failed to load dashboard data.');
@@ -32,17 +29,16 @@ const DashboardContent = () => {
     fetchData();
   }, [fetchData]);
 
-  // Use a safety check for residents array before running calculations (solves the error)
   const safeResidents = residents || [];
   
-  // Calculate statistics - residents are guaranteed to have the totalDue field
+  // totalDue is already calculated in getAllResidentsWithCalculations (from storage.js)
   const totalPending = safeResidents.reduce((sum, resident) => sum + (resident.totalDue || 0), 0);
   
   const residentsWithDues = safeResidents.filter(resident => (resident.totalDue || 0) > 0).length;
   
+  // UPDATED LOGIC: Total collected is the sum of paidAmount across all bills
   const totalCollected = safeResidents.reduce((sum, resident) => {
-    const paidBills = resident.bills?.filter(b => b.paid) || [];
-    return sum + paidBills.reduce((billSum, bill) => billSum + calculateBillTotal(bill), 0);
+    return sum + (resident.bills || []).reduce((billSum, bill) => billSum + (bill.paidAmount || 0), 0);
   }, 0);
   
   const occupancyRate = safeResidents.length > 0 ? ((safeResidents.length / maxCapacity) * 100).toFixed(1) : 0;

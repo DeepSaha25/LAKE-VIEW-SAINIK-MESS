@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCurrentUser, logout, calculateBillTotal, getResidentById } from '@/utils/storage';
+import { getCurrentUser, logout, calculateBillTotal, getResidentById, getTotalPending } from '@/utils/storage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -25,7 +25,7 @@ const ResidentDashboard = () => {
     
     setCurrentUser(user);
 
-    // NEW: Fetch full resident details (including bills) from API
+    // Fetch full resident details (including bills) from API
     const fetchDetails = async () => {
       setIsLoading(true);
       try {
@@ -65,9 +65,22 @@ const ResidentDashboard = () => {
     (b) => `${b.month}-${b.year}` === selectedMonth
   );
 
-  const totalDue = bills
-    .filter((b) => !b.paid)
-    .reduce((sum, bill) => sum + calculateBillTotal(bill), 0) || 0;
+  // UPDATED: Use the new utility function for total pending
+  const totalDue = getTotalPending(residentData) || 0;
+
+  let billStatus = 'Pending';
+  if (selectedBill) {
+    const total = calculateBillTotal(selectedBill);
+    const paid = selectedBill.paidAmount || 0;
+    
+    if (paid >= total) {
+      billStatus = 'Paid';
+    } else if (paid > 0) {
+      billStatus = 'Partial';
+    } else {
+      billStatus = 'Pending';
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -111,7 +124,7 @@ const ResidentDashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardHeader className="pb-3">
-              <CardDescription>Total Pending</CardDescription>
+              <CardDescription>Total Pending Dues</CardDescription>
               <CardTitle className="text-3xl text-destructive flex items-center">
                 <IndianRupee className="h-6 w-6" />
                 {totalDue.toLocaleString()}
@@ -169,8 +182,8 @@ const ResidentDashboard = () => {
                   </CardTitle>
                   <CardDescription>Detailed breakdown of your monthly charges</CardDescription>
                 </div>
-                <Badge variant={selectedBill.paid ? 'default' : 'destructive'} className="text-sm">
-                  {selectedBill.paid ? 'Paid' : 'Pending'}
+                <Badge variant={billStatus === 'Paid' ? 'default' : billStatus === 'Partial' ? 'warning' : 'destructive'} className="text-sm">
+                  {billStatus}
                 </Badge>
               </div>
             </CardHeader>
@@ -212,17 +225,36 @@ const ResidentDashboard = () => {
                 
                 <Separator />
                 
-                <div className="flex justify-between items-center p-6 bg-primary/10 rounded-lg border-2 border-primary/20">
-                  <span className="text-xl font-semibold text-foreground">Total Amount</span>
-                  <span className="text-3xl font-bold text-primary flex items-center">
-                    <IndianRupee className="h-7 w-7" />
-                    {calculateBillTotal(selectedBill).toLocaleString()}
-                  </span>
+                {/* Total and Paid Summary */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                     <div className="p-4 bg-primary/10 rounded-lg border-2 border-primary/20">
+                      <p className="text-sm font-semibold text-foreground mb-1">Total Bill</p>
+                      <span className="text-xl font-bold text-primary flex items-center">
+                        <IndianRupee className="h-6 w-6" />
+                        {calculateBillTotal(selectedBill).toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div className="p-4 bg-success/10 rounded-lg border-2 border-success/20">
+                      <p className="text-sm font-semibold text-foreground mb-1">Amount Paid</p>
+                      <span className="text-xl font-bold text-success flex items-center">
+                        <IndianRupee className="h-6 w-6" />
+                        {(selectedBill.paidAmount || 0).toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div className="p-4 bg-destructive/10 rounded-lg border-2 border-destructive/20">
+                      <p className="text-sm font-semibold text-foreground mb-1">Remaining Due</p>
+                      <span className="text-xl font-bold text-destructive flex items-center">
+                        <IndianRupee className="h-6 w-6" />
+                        {Math.max(0, calculateBillTotal(selectedBill) - (selectedBill.paidAmount || 0)).toLocaleString()}
+                      </span>
+                    </div>
                 </div>
                 
-                {selectedBill.paid && selectedBill.paidDate && (
+                {selectedBill.paidAmount > 0 && selectedBill.paidDate && (
                   <div className="text-center text-sm text-success">
-                    Paid on {new Date(selectedBill.paidDate).toLocaleDateString('en-IN', {
+                    First payment received on {new Date(selectedBill.paidDate).toLocaleDateString('en-IN', {
                       day: 'numeric',
                       month: 'long',
                       year: 'numeric'
@@ -230,7 +262,7 @@ const ResidentDashboard = () => {
                   </div>
                 )}
                 
-                {!selectedBill.paid && selectedBill.dueDate && (
+                {billStatus !== 'Paid' && selectedBill.dueDate && (
                   <div className="text-center text-sm text-destructive">
                     Due date: {new Date(selectedBill.dueDate).toLocaleDateString('en-IN', {
                       day: 'numeric',
