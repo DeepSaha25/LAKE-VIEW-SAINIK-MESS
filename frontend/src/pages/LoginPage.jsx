@@ -79,8 +79,8 @@ const LoginPage = () => {
               <Building2 className="h-8 w-8 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Lakeview Sainik</h1>
-              <p className="text-muted-foreground">Mess PG Management</p>
+              <h1 className="text-3xl font-bold text-foreground">Lakeview Sainik Mess</h1>
+              <p className="text-muted-foreground">PG Management</p>
             </div>
           </div>
           
@@ -108,10 +108,6 @@ const LoginPage = () => {
           
           <div className="bg-card border border-border rounded-lg p-4">
             <p className="text-xs text-muted-foreground mb-2">Demo Credentials:</p>
-            <div className="text-sm space-y-1">
-              <p className="text-foreground"><span className="font-medium">Admin:</span> admin / admin123</p>
-              <p className="text-foreground"><span className="font-medium">Resident:</span> Select from dropdown</p>
-            </div>
           </div>
         </div>
 
