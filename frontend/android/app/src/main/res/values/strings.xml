@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">LakeView Sainik Mess</string>
+    <string name="title_activity_main">LakeView Sainik Mess</string>
+    <string name="package_name">com.deep.sainikmess</string>
+    <string name="custom_url_scheme">com.deep.sainikmess</string>
+</resources>
